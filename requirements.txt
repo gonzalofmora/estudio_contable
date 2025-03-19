@@ -1,0 +1,7 @@
+## Setup
+
+# ESte proyecto utiliza las siguientes variables:
+
+# EXCEL_FILE_PATH → Para un archivo de excel.
+# USER → Para un usuario, gralmente un CUIT
+# PASSWORD → Para entrar a AFIP
