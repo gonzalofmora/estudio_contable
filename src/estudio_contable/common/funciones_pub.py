@@ -75,6 +75,7 @@ def afip_login(user, password, carpeta_descargas=None):
 
 def afip_cargar_compras(driver, df):
     campos_dic = {
+        "Tipo"                 : "button[data-id='cm_tipoComprobante']",
         "Fecha"                : "cm_fechaEmision",
         "Punto de Venta"       : "cm_ptoVta",
         "Número Desde"         : "cm_numero",
@@ -84,23 +85,36 @@ def afip_cargar_compras(driver, df):
         "Imp. Op. Exentas"     : "cm_importeExento",
         "Perc. IIBB"           : "cm_percepcionesIIBB",
         "Perc. IVA"            : "cm_percepcionesIVA",
-        "Imp. Neto Gravado"    : "cm_netoGravadoIVA21"
+        "Neto 21%"    : "cm_netoGravadoIVA21",
+        "Neto 10,5%"    : "cm_netoGravadoIVA105",
     }
-
+        
     for row in range(len(df["Fecha"])):
         driver.find_element(By.ID, "btnCargaManual").click()
         time.sleep(2)
-        fechas_formato_bien = df["Fecha"].dt.strftime('%d/%m/%Y')
-
         for i in campos_dic:
-            campo = driver.find_element(By.ID, campos_dic[i])
-            campo.clear()
             if i == "Fecha":
-                campo.send_keys(fechas_formato_bien[row])
+                campo = driver.find_element(By.ID, campos_dic[i])
+                campo.clear()
+                campo.send_keys(df["Fecha"].dt.strftime('%d/%m/%Y')[row])
                 campo.send_keys(Keys.ESCAPE)
+            elif i == "Tipo":
+                dropdown_button = driver.find_element(By.CSS_SELECTOR, campos_dic[i])
+                actions = ActionChains(driver)
+                actions.move_to_element(dropdown_button).click()
+                actions.perform()
+                time.sleep(1)
+                actions.send_keys(str(df[i][row]))
+                actions.send_keys(Keys.ENTER)
+                actions.perform()
+                print(df[i][row])
+                #break
             else:
+                campo = driver.find_element(By.ID, campos_dic[i])
+                campo.clear()
                 campo.send_keys(df[i][row])
             time.sleep(1)
+        print(f"Comprobante n° {row +1} impreso")        
         driver.find_element(By.ID, "btnAgregarComprobanteManual").click()
         time.sleep(2)
 
