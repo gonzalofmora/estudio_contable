@@ -22,6 +22,8 @@ password = os.getenv('PASSWORD')
 driver = afip_login(user, password)
 
 time.sleep(2)
+continuar = input("Enter para continuar")
+
 elegir_tab(driver, 1)
 driver.get(link_afip_compras_portal_iva)
 

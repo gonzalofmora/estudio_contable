@@ -10,6 +10,11 @@ from selenium.webdriver.support import expected_conditions as EC
 import zipfile
 
 
+
+# Links
+link_afip = "https://auth.afip.gob.ar/contribuyente_/login.xhtml"
+link_afip_compras_portal_iva = r"https://liva.afip.gob.ar/liva/jsp/verCompras.do?t=21"
+
 ## Funciones para navegar en internet
 
 def abrir_navegador(link, carpeta_descargas=None):
@@ -40,7 +45,14 @@ def abrir_navegador(link, carpeta_descargas=None):
     driver.get(link)
     return driver
 
-
+def elegir_tab(driver, num):
+    """Elegí la pestaña que quieras usar, usando su número correspondiente (primera pestaña es el 0)"""
+    tabs = driver.window_handles
+    if num < len(tabs):
+        driver.switch_to.window(tabs[num])
+    else:
+        raise IndexError("La tab no existe")
+    
 ## Funciones para trabajar en AFIP
 
 def afip_login(user, password, carpeta_descargas=None):
@@ -70,6 +82,8 @@ def afip_cargar_compras(driver, df):
         "Imp. Total"           : "cm_importeTotal",
         "Imp. Neto No Gravado" : "cm_netoNoGravado",
         "Imp. Op. Exentas"     : "cm_importeExento",
+        "Perc. IIBB"           : "cm_percepcionesIIBB",
+        "Perc. IVA"            : "cm_percepcionesIVA",
         "Imp. Neto Gravado"    : "cm_netoGravadoIVA21"
     }
 
@@ -83,6 +97,7 @@ def afip_cargar_compras(driver, df):
             campo.clear()
             if i == "Fecha":
                 campo.send_keys(fechas_formato_bien[row])
+                campo.send_keys(Keys.ESCAPE)
             else:
                 campo.send_keys(df[i][row])
             time.sleep(1)
