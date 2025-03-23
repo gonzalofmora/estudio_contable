@@ -1,22 +1,33 @@
-from selenium import webdriver                          # webdriver sirve para agarrar el navegador
-from selenium.webdriver.common.by import By             # By sirve para filtrar elementos
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.common.keys import Keys         # Para importar las teclas del teclado
-from pathlib import Path
-import time                                             # time sirve para hacer demorar el archivo para que cargue
-from selenium.webdriver.support.ui import Select        # Para elegir de desplegables
-from selenium.webdriver.support.ui import WebDriverWait          # Para que espere mientras carga la página 
-from selenium.webdriver.support import expected_conditions as EC 
+import shutil
+import time                                                                    # time sirve para hacer demorar el archivo para que cargue
 import zipfile
+from .clientes_pub import clientes
+from datetime                                import datetime, timedelta
+#from dotenv                                  import dotenv_values              # Para cargar environment variables
+from pathlib                                 import Path
+from selenium                                import webdriver                  # webdriver sirve para agarrar el navegador
+from selenium.webdriver.common.by            import By                         # By sirve para filtrar elementos
+from selenium.webdriver.common.action_chains import ActionChains               # Para realizar cadenas de comandos de teclado
+from selenium.webdriver.common.keys          import Keys                       # Para importar las teclas del teclado
+from selenium.webdriver.support              import expected_conditions as EC  # Para esperar los elementos
+from selenium.webdriver.support.ui           import Select                     # Para elegir de desplegables
+from selenium.webdriver.support.ui           import WebDriverWait              # Para que espere mientras carga la página 
 
 
+"""
+# Glosario de iniciales de las funciones
+    mc = Mis comprobantes
+    cel = Comprobantes en Línea
+"""
+# # Environment Variables
+# variables = dotenv_values()
+# clientes = Path(variables.get('CLIENTES_FILE_PATH'))
 
 # Links
 link_afip = "https://auth.afip.gob.ar/contribuyente_/login.xhtml"
 link_afip_compras_portal_iva = r"https://liva.afip.gob.ar/liva/jsp/verCompras.do?t=21"
 
 ## Funciones para navegar en internet
-
 def abrir_navegador(link, carpeta_descargas=None):
     """ Abre el navegador web
     link: el link que querés abrir
@@ -52,27 +63,21 @@ def elegir_tab(driver, num):
         driver.switch_to.window(tabs[num])
     else:
         raise IndexError("La tab no existe")
-    
+
+## Funciones para trabajar con la (eventual) base de datos
+def elegir_cliente():
+
+    while True:
+        try:
+            cliente = input("> Nombre del cliente: ")
+            user     = clientes[cliente][0]
+            password = clientes[cliente][1]
+            return  user, password
+
+        except Exception as e:
+            print(f"Ese cliente no existe bro, fijate qué onda.")
+
 ## Funciones para trabajar en AFIP
-
-def afip_login(user, password, carpeta_descargas=None):
-    driver = abrir_navegador(link_afip,carpeta_descargas=carpeta_descargas)
-    username = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.ID, "F1:username"))
-    )
-    #username = driver.find_element(By.ID, "F1:username")
-    #username.clear()
-    username.send_keys(user)
-    driver.find_element(By.ID, "F1:btnSiguiente").click()
-    passwd  = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.ID, "F1:password"))
-    )   
-    passwd.send_keys(password)
-    #driver.find_element(By.ID, "F1:password").send_keys(password)
-    driver.find_element(By.ID, "F1:btnIngresar").click()
-    time.sleep(3)
-    return driver
-
 def afip_cargar_compras(driver, df):
     campos_dic = {
         "Tipo"                 : "button[data-id='cm_tipoComprobante']",
@@ -118,7 +123,7 @@ def afip_cargar_compras(driver, df):
         driver.find_element(By.ID, "btnAgregarComprobanteManual").click()
         time.sleep(2)
 
-def cerrar_afip(driver):
+def afip_cerrar_sesion(driver):
     """
     TODO Cerrar de verdad
     """
@@ -126,3 +131,111 @@ def cerrar_afip(driver):
     time.sleep(3)
     driver.find_element(By.ID, "userIconoChico").click()
     driver.find_element(By.CLASS_NAME, "fa.fa-sign-out.h4.text-primary.m-a-0").click()
+
+def afip_elegir_aplicativo(driver, aplicativo=0, elegir_applicativo=False):
+    """
+    Aplicativos:
+    0 → Mis Comprobantes,
+    1 → Comprobantes en línea,
+    2 → SIFERE WEB,
+    3 → SIFERE Consultas,
+    4 → Portal IVA
+    """
+    aplicativos = ["Mis Comprobantes", "Comprobantes en línea", "Sifere WEB - DDJJ", "Sifere WEB - Consultas", "Portal IVA"]
+    aplicativo_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "buscadorInput")))
+    
+    if elegir_applicativo:
+        input = input("> ")
+        aplicativo_input.send_keys(input)
+    else:
+        aplicativo_input.send_keys(aplicativos[aplicativo])
+
+    aplicativo_input.send_keys(Keys.ARROW_DOWN)
+    aplicativo_input.send_keys(Keys.ENTER)
+    time.sleep(2)
+
+    tabs = driver.window_handles
+    elegir_tab(driver, len(tabs)-1 )
+
+def afip_login(user, password, carpeta_descargas=None):
+    driver = abrir_navegador(link_afip,carpeta_descargas=carpeta_descargas)
+    username = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.ID, "F1:username"))
+    )
+    #username = driver.find_element(By.ID, "F1:username")
+    #username.clear()
+    username.send_keys(user)
+    driver.find_element(By.ID, "F1:btnSiguiente").click()
+    passwd  = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.ID, "F1:password"))
+    )   
+    passwd.send_keys(password)
+    #driver.find_element(By.ID, "F1:password").send_keys(password)
+    driver.find_element(By.ID, "F1:btnIngresar").click()
+    time.sleep(3)
+    return driver
+
+
+### Funciones para trabajar con el portal Mis Comprobantes dentro de AFIP
+def mc_descargar_comprobantes(driver, mes, tipo=1):
+    """
+    tipo = 0 → excel
+    tipo = 1 → csv
+    """
+    fecha_emision_button = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.ID, "fechaEmision")))
+    fecha_emision_button.clear()
+    fecha_emision_button.send_keys(mes)
+    fecha_emision_button.send_keys(Keys.ENTER)
+    driver.find_element(By.ID, "buscarComprobantes").click()
+    time.sleep(3)
+    
+    if tipo == 0:
+        excel_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.CLASS_NAME, "btn.btn-default.buttons-excel.buttons-html5.btn-defaut.btn-sm.sinborde")))
+        excel_button.click()
+    else:
+        csv_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, '//button[span="CSV"]')))
+        csv_button.click()
+    time.sleep(1)
+
+def mc_log_in(driver,tipo="ventas", cliente=0):
+    """
+    tipo: 'ventas':  Comprobantes emitidos (default) 
+    tipo: 'compras': Comprobantes recibidos
+    cliente: 0 para el representado excepto que tenga una empresa a su nombre. En ese caso, la empresa es 0, y 1 el representado
+    """
+    afip_elegir_aplicativo(driver, 0)
+    driver.get(f"https://fes.afip.gob.ar/mcmp/jsp/setearContribuyente.do?idContribuyente={cliente}")
+    if tipo == "ventas":
+        driver.get("https://fes.afip.gob.ar/mcmp/jsp/comprobantesEmitidos.do")
+    else:
+        driver.get("https://fes.afip.gob.ar/mcmp/jsp/comprobantesRecibidos.do")
+    time.sleep(3)
+
+def mc_renombrar_y_mover(origen, destino):
+
+    folder = Path(origen)
+    destination = Path(destino)
+    destination.mkdir(parents=True, exist_ok=True)
+
+
+    today = datetime.today()
+    today_start = datetime(today.year, today.month, today.day)
+    today_end = today_start + timedelta(days=1)
+
+    xlsx_files = folder.glob("*.xlsx")
+
+    for file in xlsx_files:
+        creation_time = datetime.fromtimestamp(file.stat().st_mtime)
+        if today_start <= creation_time < today_end:
+            if today.month <= 10:
+                new_name = file.with_stem(f"{file.stem} - {today.year}0{today.month-1}")
+            else:
+                new_name = file.with_stem(f"{file.stem} - {today.year}{today.month-1}")
+            file.rename(new_name)
+            print(f"Renamed: {file.name} → {new_name.name}")
+            shutil.move(new_name, destination / new_name.name)
+            print(f"Archivo trasladado")
+
