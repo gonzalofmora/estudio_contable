@@ -64,6 +64,17 @@ def elegir_tab(driver, num):
     else:
         raise IndexError("La tab no existe")
 
+def tabear(driver, tabeos=1, con_barra=False):
+    "Acción para tabear muchas veces y apretar enter. con_barra sirve para apretar la barra en vez del enter"
+    actions = ActionChains(driver)
+    actions.send_keys(Keys.TAB * tabeos)
+    if con_barra:
+        actions.send_keys(Keys.SPACE)
+    else:
+        actions.send_keys(Keys.ENTER)
+    actions.perform()
+
+
 ## Funciones para trabajar con la (eventual) base de datos
 def elegir_cliente():
 
