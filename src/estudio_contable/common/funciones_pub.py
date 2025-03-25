@@ -1,9 +1,9 @@
+import json
 import shutil
 import time                                                                    # time sirve para hacer demorar el archivo para que cargue
 import zipfile
-from .clientes_pub import clientes
 from datetime                                import datetime, timedelta
-#from dotenv                                  import dotenv_values              # Para cargar environment variables
+from dotenv                                  import dotenv_values              # Para cargar environment variables
 from pathlib                                 import Path
 from selenium                                import webdriver                  # webdriver sirve para agarrar el navegador
 from selenium.webdriver.common.by            import By                         # By sirve para filtrar elementos
@@ -20,8 +20,10 @@ from selenium.webdriver.support.ui           import WebDriverWait              #
     cel = Comprobantes en Línea
 """
 # # Environment Variables
-# variables = dotenv_values()
-# clientes = Path(variables.get('CLIENTES_FILE_PATH'))
+variables = dotenv_values()
+# El diccionario tiene que tener la siguiente estructura:
+#     clientes = '{cliente1: ["cuit", "contraseña"], cliente2: ["cuit", "contraseña"], ...}'   | Tiene que ser un json para poder estar como environment variable.
+clientes = json.loads(variables.get('CLIENTES'))
 
 # Links
 link_afip = "https://auth.afip.gob.ar/contribuyente_/login.xhtml"
