@@ -1,0 +1,18 @@
+# 26/03/2025
+
+No hay mucho para hablar, me quiero ir a acostar. Logré modificar y mejorar todas las funciones dentro de mis_comprobantes. Ahora no debería fallar por falta de carga de algún elemento.
+
+Por otra parte, ahora el diccionario de clientes en el .env incluye el código de mis comprobantes para poder bajar bien el cliente en mis comprobantes. Tiene un nuevo formato que se especifica en las modificaciones del archivo funciones_pub.py. Único archivo modificado.
+
+Quiero hacer una función general que englobe todo, la hice, no me convence igual.
+
+Puede que lo mejor sea refactorizar como clase y a otra cosa.
+
+Me seduce un poco la idea de crear una función para componer funciones. El tema está en que varias de mis funciones no devuelven nada, porque no tienen nada que devolver. Entonces me parece que medio complica las cosas.
+
+En cuanto objetivo de mañana, no va a haber tal realmente. Va a estar difícil hacer algo porque mañana voy a la oficina y la facultad. 
+
+Quizá pueda probar si anda la función general que armé y armar el for loop para esa función. Quizá no. Lo que sí quizá pueda probar sea el descargar en más de una compu el repositorio. Eso sí podría llegar a hacerse. Habrá que ver qué onda. Cómo va el día.
+
+En fin, eso. Saludos.
+

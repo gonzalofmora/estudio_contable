@@ -85,7 +85,8 @@ def elegir_cliente():
             cliente = input("> Nombre del cliente: ")
             user     = clientes[cliente][0]
             password = clientes[cliente][1]
-            return  user, password
+            codigo_mis_compp = clientes[cliente][2]
+            return  user, password, codigo_mis_compp
 
         except Exception as e:
             print(f"Ese cliente no existe bro, fijate qué onda.")
@@ -141,9 +142,13 @@ def afip_cerrar_sesion(driver):
     TODO Cerrar de verdad
     """
     driver.get("https://portalcf.cloud.afip.gob.ar/portal/app/")
-    time.sleep(3)
-    driver.find_element(By.ID, "userIconoChico").click()
-    driver.find_element(By.CLASS_NAME, "fa.fa-sign-out.h4.text-primary.m-a-0").click()
+    #time.sleep(3)
+    user_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "userIconoChico")))
+    user_btn.click()
+    #driver.find_element(By.ID, "userIconoChico").click()
+    cerrar_sesion_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "fa.fa-sign-out.h4.text-primary.m-a-0")))
+    cerrar_sesion_btn.click()
+    #driver.find_element(By.CLASS_NAME, "fa.fa-sign-out.h4.text-primary.m-a-0").click()
 
 def afip_elegir_aplicativo(driver, aplicativo=0, elegir_applicativo=False):
     """
@@ -172,19 +177,19 @@ def afip_elegir_aplicativo(driver, aplicativo=0, elegir_applicativo=False):
 
 def afip_login(user, password, carpeta_descargas=None):
     driver = abrir_navegador(link_afip,carpeta_descargas=carpeta_descargas)
-    username = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.ID, "F1:username"))
-    )
-    #username = driver.find_element(By.ID, "F1:username")
-    #username.clear()
+    username = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "F1:username")))
+    username.clear()
     username.send_keys(user)
-    driver.find_element(By.ID, "F1:btnSiguiente").click()
-    passwd  = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.ID, "F1:password"))
-    )   
+
+    siguiente_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "F1:btnSiguiente")))
+    siguiente_btn.click()
+
+    passwd  = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "F1:password")))
+    passwd.clear()
     passwd.send_keys(password)
-    #driver.find_element(By.ID, "F1:password").send_keys(password)
-    driver.find_element(By.ID, "F1:btnIngresar").click()
+
+    ingresar_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "F1:btnIngresar")))
+    ingresar_btn.click()
     time.sleep(3)
     return driver
 
@@ -195,21 +200,21 @@ def mc_descargar_comprobantes(driver, mes, tipo=1):
     tipo = 0 → excel
     tipo = 1 → csv
     """
-    fecha_emision_button = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.ID, "fechaEmision")))
+    fecha_emision_button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "fechaEmision")))
     fecha_emision_button.clear()
     fecha_emision_button.send_keys(mes)
     fecha_emision_button.send_keys(Keys.ENTER)
-    driver.find_element(By.ID, "buscarComprobantes").click()
-    time.sleep(3)
+
+    buscar_comprobantes_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "buscarComprobantes")))
+    buscar_comprobantes_btn.click()
+    #driver.find_element(By.ID, "buscarComprobantes").click()
+    #time.sleep(3)
     
     if tipo == 0:
-        excel_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.CLASS_NAME, "btn.btn-default.buttons-excel.buttons-html5.btn-defaut.btn-sm.sinborde")))
+        excel_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME, "btn.btn-default.buttons-excel.buttons-html5.btn-defaut.btn-sm.sinborde")))
         excel_button.click()
     else:
-        csv_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, '//button[span="CSV"]')))
+        csv_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, '//button[span="CSV"]')))
         csv_button.click()
     time.sleep(1)
 
