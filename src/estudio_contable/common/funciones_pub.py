@@ -85,8 +85,8 @@ def elegir_cliente():
             cliente = input("> Nombre del cliente: ")
             user     = clientes[cliente][0]
             password = clientes[cliente][1]
-            codigo_mis_compp = clientes[cliente][2]
-            return  user, password, codigo_mis_compp
+            codigo_mis_comp = clientes[cliente][2]
+            return  user, password, codigo_mis_comp
 
         except Exception as e:
             print(f"Ese cliente no existe bro, fijate qué onda.")
