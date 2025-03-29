@@ -226,11 +226,38 @@ def mc_log_in(driver,tipo="ventas", cliente=0):
     """
     afip_elegir_aplicativo(driver, 0)
     driver.get(f"https://fes.afip.gob.ar/mcmp/jsp/setearContribuyente.do?idContribuyente={cliente}")
+    time.sleep(1)
     if tipo == "ventas":
         driver.get("https://fes.afip.gob.ar/mcmp/jsp/comprobantesEmitidos.do")
     else:
         driver.get("https://fes.afip.gob.ar/mcmp/jsp/comprobantesRecibidos.do")
     time.sleep(3)
+
+def mc_obtener_comprobantes(tipo_de_archivo, tipo_de_comprobantes, mes, carpeta_descargas, carpeta_destino, en_cantidad=False):
+    """
+    tipo_de_archivo: 0 para excel | 1 para csv
+    tipo_de_comprobantes: 'compras' | 'ventas'
+    mes (ejemplo de formato): 01/02/2025 - 28/02/2025
+    carpeta_descargas: a donde va a ir a parar el archivo descargado
+    carpeta_destino: a donde va a terminar el archivo descargado
+    """
+
+    if en_cantidad:
+        for cliente in clientes:
+            user = clientes[cliente][0]
+            password = clientes[cliente][1]
+            mc_cod = clientes[cliente][2]
+            mc_hacer_todo(user, password, mc_cod, tipo_de_archivo, tipo_de_comprobantes, mes, carpeta_descargas, carpeta_destino)
+    else:
+        user, password, mc_cod = elegir_cliente()
+        mc_hacer_todo(user, password, mc_cod, tipo_de_archivo, tipo_de_comprobantes, mes, carpeta_descargas, carpeta_destino)
+
+def mc_hacer_todo(user, password, mc_cod, tipo_de_archivo, tipo_de_comprobantes, mes, carpeta_descargas,  carpeta_destino):
+    driver  = afip_login(user, password, carpeta_descargas)
+    mc_log_in(driver, tipo_de_comprobantes, mc_cod)
+    mc_descargar_comprobantes(driver, mes,tipo_de_archivo)
+    afip_cerrar_sesion(driver)
+    mc_renombrar_y_mover(carpeta_descargas, carpeta_destino)
 
 def mc_renombrar_y_mover(origen, destino):
 
