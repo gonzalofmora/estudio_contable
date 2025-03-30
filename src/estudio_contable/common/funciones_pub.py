@@ -22,7 +22,7 @@ from selenium.webdriver.support.ui           import WebDriverWait              #
 # # Environment Variables
 variables = dotenv_values()
 # El diccionario tiene que tener la siguiente estructura:
-#     clientes = '{cliente1: ["cuit", "contraseña"], cliente2: ["cuit", "contraseña"], ...}'   | Tiene que ser un json para poder estar como environment variable.
+#     clientes = '{cliente1: ["cuit", "contraseña", "codigo_mc"], cliente2: ["cuit", "contraseña", "codigo_mc"], ...}'   | Tiene que ser un json para poder estar como environment variable.
 clientes = json.loads(variables.get('CLIENTES'))
 
 # Links
