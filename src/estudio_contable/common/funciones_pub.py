@@ -257,30 +257,22 @@ def mc_hacer_todo(user, password, mc_cod, tipo_de_archivo, tipo_de_comprobantes,
     mc_log_in(driver, tipo_de_comprobantes, mc_cod)
     mc_descargar_comprobantes(driver, mes,tipo_de_archivo)
     afip_cerrar_sesion(driver)
-    mc_renombrar_y_mover(carpeta_descargas, carpeta_destino)
+    mc_renombrar_y_mover(carpeta_descargas, carpeta_destino, mes)
 
-def mc_renombrar_y_mover(origen, destino):
+def mc_renombrar_y_mover(origen, destino, mes):
 
     folder = Path(origen)
     destination = Path(destino)
     destination.mkdir(parents=True, exist_ok=True)
-
-
-    today = datetime.today()
-    today_start = datetime(today.year, today.month, today.day)
-    today_end = today_start + timedelta(days=1)
-
+    mes_num = mes[3:5]
+    año     = mes[6:10]
     xlsx_files = folder.glob("*.xlsx")
 
     for file in xlsx_files:
-        creation_time = datetime.fromtimestamp(file.stat().st_mtime)
-        if today_start <= creation_time < today_end:
-            if today.month <= 10:
-                new_name = file.with_stem(f"{file.stem} - {today.year}0{today.month-1}")
-            else:
-                new_name = file.with_stem(f"{file.stem} - {today.year}{today.month-1}")
-            file.rename(new_name)
-            print(f"Renamed: {file.name} → {new_name.name}")
-            shutil.move(new_name, destination / new_name.name)
-            print(f"Archivo trasladado")
+        new_name = file.with_stem(f"{file.stem} - {año}{mes_num}")
+        file.rename(new_name)
+        print(f"Renamed: {file.name} → {new_name.name}")
+        shutil.move(new_name, destination / new_name.name)
+        print(f"Archivo trasladado a {destination}")
+
 

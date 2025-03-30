@@ -3,7 +3,7 @@ from dotenv import dotenv_values
 from pathlib import Path
 variables = dotenv_values()
 
-tipo_comprobantes = "ventas"
+tipo_comprobantes = "compras"
 carpeta_de_descarga = Path(variables.get('MC_FOLDER_ORIGIN_PATH'))
 carpeta_de_destino = Path(f"{variables.get('MC_FOLDER_DESTINATION_PATH')}/{tipo_comprobantes.capitalize()}")
 mes =  "01/03/2025 - 30/03/2025"
