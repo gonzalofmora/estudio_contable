@@ -7,8 +7,9 @@ import time
 
 variables = dotenv_values()
 
-user, password = elegir_cliente() 
-facturas_a_subir = Path(variables.get('EXCEL_FILE_PATH'))
+user, password, _ = elegir_cliente() 
+cliente = variables.get('CLIENTE_A_FACTURAR')
+facturas_a_subir = Path(f"{variables.get('EXCEL_FILE_PATH')}/{cliente}/{cliente}.xlsx")
 df = pd.read_excel(facturas_a_subir,sheet_name='ventas_a_subir')
 
 # Esta es la estructura del df de ventas requerido por el momento:
@@ -20,18 +21,23 @@ df = pd.read_excel(facturas_a_subir,sheet_name='ventas_a_subir')
 # unidades                int64
 # precio                  int64
 
+print("Estas son las ventas a publicar:")
+print(df.head())
+proceder = print(input('Proceder? s/n > '))
 
-driver = afip_login(user, password)
+if proceder == "s":
+    driver = afip_login(user, password)
+    afip_elegir_aplicativo(driver,1)    # Elegimos la app Comprobantes emitidos
+    time.sleep(1)
+    elegir_tab(driver,1)           # Vamos a la pestaña de la app
+    time.sleep(1)
+
+    # Esto está hardcodeado según mis necesidades. Las necesidades del cliente pueden variar. TODO: Sacar el hardcodeo
+    cel_seleccionar_empresa(driver, 2)  # Elegimos la empresa a la que le vamos a cargar facturas
+    time.sleep(1)
+
+    cel_facturar_mucho(driver, df)
+else:
+    print('Misión abortada')
 
 
-
-afip_elegir_aplicativo(driver,1)    # Elegimos la app Comprobantes emitidos
-time.sleep(1)
-elegir_tab(driver,1)           # Vamos a la pestaña de la app
-time.sleep(1)
-
-# Esto está hardcodeado según mis necesidades. Las necesidades del cliente pueden variar. TODO: Sacar el hardcodeo
-cel_seleccionar_empresa(driver, 2)  # Elegimos la empresa a la que le vamos a cargar facturas
-time.sleep(1)
-
-cel_facturar_mucho(driver, df)

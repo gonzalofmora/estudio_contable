@@ -195,10 +195,9 @@ def afip_login(user, password, carpeta_descargas=None):
 
 
 ### Funciones para trabajar con el portal Mis Comprobantes dentro de AFIP
-def mc_descargar_comprobantes(driver, mes, tipo=1):
+def mc_descargar_comprobantes(driver, mes, tipo='csv'):
     """
-    tipo = 0 → excel
-    tipo = 1 → csv
+    tipo: 'excel' | 'csv'
     """
     fecha_emision_button = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "fechaEmision")))
     fecha_emision_button.clear()
@@ -210,12 +209,16 @@ def mc_descargar_comprobantes(driver, mes, tipo=1):
     #driver.find_element(By.ID, "buscarComprobantes").click()
     #time.sleep(3)
     
-    if tipo == 0:
+    if tipo == 'csv':
+        csv_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, '//button[span="CSV"]')))
+        csv_button.click()
+    elif tipo == 'excel':
         excel_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME, "btn.btn-default.buttons-excel.buttons-html5.btn-defaut.btn-sm.sinborde")))
         excel_button.click()
     else:
-        csv_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, '//button[span="CSV"]')))
-        csv_button.click()
+        tipo_elegido = input('Por favor elegí entre "excel" o "csv": ')
+        mc_descargar_comprobantes(driver, mes, tipo_elegido)
+        
     time.sleep(1)
 
 def mc_log_in(driver,tipo="ventas", cliente=0):

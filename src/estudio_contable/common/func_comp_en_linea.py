@@ -14,8 +14,8 @@ def cel_seleccionar_empresa(driver, num):
 
 def cel_elegir_accion(driver, num):
     """Elegir si generar comprobantes o consultar comprobantes | TODO la consulta"""
-    generar_comprobantes_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "btn_gen_cmp"))).click() 
-    generar_comprobantes_btn = driver.find_element(By.ID, "btn_gen_cmp")
+    generar_comprobantes_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "btn_gen_cmp")))
+    #generar_comprobantes_btn = driver.find_element(By.ID, "btn_gen_cmp")
     if num == 0:
         generar_comprobantes_btn.click()
         time.sleep(1)
@@ -44,7 +44,7 @@ def cel_fechas(driver, tipo, fecha):
         tipo = "fsd"
     else:
         tipo = "fsh"
-    fecha_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, tipo))).click() 
+    fecha_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, tipo)))
     #fecha_btn = driver.find_element(By.ID, tipo)
     fecha_btn.clear()
     fecha_btn.send_keys(fecha)
@@ -111,7 +111,7 @@ def cel_detalles(driver, tipo, texto):
         tipo = "detalle_cantidad1"
     else:
         tipo = "detalle_precio1"
-    fecha_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, tipo))).click() 
+    fecha_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, tipo)))
     #fecha_btn = driver.find_element(By.ID, tipo)
     fecha_btn.clear()
     fecha_btn.send_keys(texto)
@@ -182,3 +182,4 @@ def cel_facturar_mucho(driver, df):
         precio = float(row['precio'])
 
         cel_facturar(driver, fecha, fecha_desde, fecha_hasta, servicio, cantidad, precio)
+        print(f"Esta venta fue facturada:\n {row}")
