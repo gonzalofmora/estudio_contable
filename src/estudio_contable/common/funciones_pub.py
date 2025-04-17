@@ -23,11 +23,30 @@ from selenium.webdriver.support.ui           import WebDriverWait              #
 variables = dotenv_values()
 # El diccionario tiene que tener la siguiente estructura:
 #     clientes = '{cliente1: ["cuit", "contraseña", "codigo_mc"], cliente2: ["cuit", "contraseña", "codigo_mc"], ...}'   | Tiene que ser un json para poder estar como environment variable.
-clientes = json.loads(variables.get('CLIENTES'))
+clientes      = json.loads(variables.get('CLIENTES'))
+clientes_arba = json.loads(variables.get('CLIENTES_ARBA'))
 
 # Links
 link_afip = "https://auth.afip.gob.ar/contribuyente_/login.xhtml"
 link_afip_compras_portal_iva = r"https://liva.afip.gob.ar/liva/jsp/verCompras.do?t=21"
+
+# Funciones para trabajar con directorios
+def extraer_zip(archivo, destino, eliminar=True):
+    """
+    arhivo: archivo .zip a extraer
+    destino: carpeta donde se van a extraer los archivos
+    eliminar: opción para eliminar o no el .zip después de la extracción
+    """
+    file = Path(archivo)
+    archvivos_extraidos = file.stem
+    destino_final = destino / archvivos_extraidos
+    destino_final.mkdir(parents=True, exist_ok=True)
+    
+    with zipfile.ZipFile(archivo, 'r') as zip_ref:
+        zip_ref.extractall(destino_final)
+    
+    if eliminar:
+        archivo.unlink()
 
 ## Funciones para navegar en internet
 def abrir_navegador(link, carpeta_descargas=None):
