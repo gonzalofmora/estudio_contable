@@ -1,4 +1,5 @@
 import json
+import pandas  as pd
 import shutil
 import time                                                                    # time sirve para hacer demorar el archivo para que cargue
 import zipfile
@@ -12,6 +13,7 @@ from selenium.webdriver.common.keys          import Keys                       #
 from selenium.webdriver.support              import expected_conditions as EC  # Para esperar los elementos
 from selenium.webdriver.support.ui           import Select                     # Para elegir de desplegables
 from selenium.webdriver.support.ui           import WebDriverWait              # Para que espere mientras carga la página 
+from sqlalchemy                              import create_engine              # Para interactuar con la base de datos
 
 
 """
@@ -296,5 +298,99 @@ def mc_renombrar_y_mover(origen, destino, mes):
         print(f"Renamed: {file.name} → {new_name.name}")
         shutil.move(new_name, destination / new_name.name)
         print(f"Archivo trasladado a {destination}")
+
+### Funciones para actualizar la base de datos con comprobantes de Mis Comprobantes
+
+def extraer_comprobantes(mc_zip_file: Path, eliminar_zip: bool=True):
+    """Extrae (sueltos) todos los archivos del ZIP dado en el directorio padre del archivo."""
+    with zipfile.ZipFile(mc_zip_file, 'r') as zip_ref:
+        zip_ref.extractall(path=mc_zip_file.parent)
+    
+    if eliminar_zip:
+        mc_zip_file.unlink()
+
+def extraer_todos_los_comprobantes(zip_folder: Path):
+    """Extrae (sueltos) todos los archivos de todos los zips."""
+    zip_folder_list = list(zip_folder.glob('*.zip'))
+    for zip_file in zip_folder_list:
+        extraer_comprobantes(zip_file)
+
+def mc_insertar_ventas_raw(df, db_path):
+    """
+    df: comprobantes a insertar
+    TODO Abstraer la función para que funcione para otro tipo de comprobantes. Quizá hacer un diccionario de funciones (no recuerdo como se llama)
+    """
+    
+    engine = create_engine(f'sqlite:///{db_path}')
+    ventas_en_tabla = pd.read_sql('SELECT tipo_de_comprobante, punto_de_venta, nro_de_comprobante_desde FROM ventas_raw', engine)
+
+    # Creamos la composite key para identificar los comprobantes únicos
+    ventas_en_tabla['composite_key'] = ventas_en_tabla['tipo_de_comprobante'].astype(str) + '_' + ventas_en_tabla['punto_de_venta'].astype(str) + '_' + ventas_en_tabla['nro_de_comprobante_desde'].astype(str)
+    df['composite_key']              = df['tipo_de_comprobante'].astype(str) + '_' + df['punto_de_venta'].astype(str) + '_' + df['nro_de_comprobante_desde'].astype(str)
+    nuevas_ventas_unicas = df[~df['composite_key'].isin(ventas_en_tabla['composite_key'])]
+    nuevas_ventas_unicas = nuevas_ventas_unicas.drop('composite_key', axis=1)
+
+    cantidad_insertada = nuevas_ventas_unicas.to_sql('ventas_raw', engine, if_exists='append', index=False, method='multi')
+    
+    return cantidad_insertada
+
+def mc_pre_procesamiento_ventas_csv(file_path: Path):
+    # Renombre de columnas
+    columnas = {
+        'Fecha de Emisión'      : 'fecha',
+        'Tipo de Comprobante'   : 'tipo_de_comprobante',
+        'Punto de Venta'        : 'punto_de_venta',
+        'Número Desde'          : 'nro_de_comprobante_desde',
+        'Número Hasta'          : 'nro_de_comprobante_hasta',
+        'Cód. Autorización'     : 'cod_autorizacion',
+        'Tipo Doc. Receptor'    : 'tipo_doc_receptor',
+        'Nro. Doc. Receptor'    : 'nro_doc_receptor',
+        'Denominación Receptor' : 'receptor',
+        'Tipo Cambio'           : 'tipo_de_cambio',
+        'Moneda'                : 'moneda',
+        'Imp. Neto Gravado'     : 'neto_gravado',
+        'Imp. Neto No Gravado'  : 'no_gravado',
+        'Imp. Op. Exentas'      : 'exento',
+        'Otros Tributos'        : 'otros_tributos',
+        'IVA'                   : 'iva',
+        'Imp. Total'            : 'importe_total'
+    }
+        # Columnas que hay que aclarar el type
+    tipos_columnas = {
+        'Tipo de Comprobante'   : str,
+        'Punto de Venta'        : str,
+        'Número Desde'          : str,
+        'Número Hasta'          : str,
+        'Cód. Autorización'     : str,
+        'Tipo Doc. Receptor'    : str,
+        'Nro. Doc. Receptor'    : str,
+        'Denominación Receptor' : str,
+        'Moneda'                : str,
+    }
+
+    # Pre-procesamiento
+    cuit_cliente, fecha_de_bajada  = file_path.stem.split()[0][-25:].split('_')
+    fecha_datetime = datetime.strptime(fecha_de_bajada, '%Y%m%d-%H%M')
+
+    # Importación
+    df_ventas_csv = pd.read_csv(
+        file_path,
+        delimiter   = ';',
+        decimal     = ',',
+        dtype       = tipos_columnas,
+    )
+
+    # Procesamiento
+    df_ventas_csv          = df_ventas_csv.rename(columns=columnas)
+    df_ventas_csv['fecha'] = pd.to_datetime(df_ventas_csv['fecha']).dt.date
+
+    # Nuevas columnas
+    df_ventas_csv['cuit_cliente'] = cuit_cliente
+    df_ventas_csv['fecha_descarga'] = fecha_datetime
+    df_ventas_csv['porcentaje_iva'] = round(df_ventas_csv['iva'] / df_ventas_csv['neto_gravado'], 2)
+
+    # Data Frame transformado
+    return df_ventas_csv
+
 
 
