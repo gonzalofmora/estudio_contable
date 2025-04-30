@@ -4,6 +4,7 @@ from selenium.webdriver.common.keys import Keys         # Para importar las tecl
 from selenium.webdriver.common.by import By             # By sirve para filtrar elementos
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 import time 
 
 
@@ -130,6 +131,32 @@ def cel_continuar_y_confirmar(driver):
     alert = wait.until(EC.alert_is_present())
     alert.accept()
 
+def cel_continuar_y_confirmar_v2(driver, retries=2, wait_time=2):
+    def try_click(locator_type, locator_value, description):
+        for attempt in range(retries + 1):
+            try:
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((locator_type, locator_value))
+                ).click()
+                return
+            except TimeoutException:
+                if attempt < retries:
+                    print(f"{description} not found. Retrying in {wait_time} seconds...")
+                    time.sleep(wait_time)
+                else:
+                    raise Exception(f'{description} nopt found after {retries + 1} attempts.')
+                
+    try_click(By.XPATH, "//input[@type='button' and @value='Continuar >']", 'botón "Continuar"')
+
+    try_click(By.ID, "btngenerar", 'botón "Confirmar" ')
+
+    try:
+        alert = WebDriverWait(driver, 2).until(EC.alert_is_present())
+        alert.accept()
+    except TimeoutException:
+        print('Sin pop-up de confirmación')
+
+
 def cel_terminar(driver, imprimir=False):
     "Elegir si volver al menú principal imprimiendo la factura o no"
     if imprimir:
@@ -165,7 +192,7 @@ def cel_facturar(driver, fecha, fecha_desde, fecha_hasta, servicio, cantidad, pr
     cel_detalles(driver, 1, cantidad)       # Cantidad vendida
     cel_detalles(driver, 2, precio)         # Precio del bien
     time.sleep(1)
-    cel_continuar_y_confirmar(driver)       # Confirmamos la operación
+    cel_continuar_y_confirmar_v2(driver)       # Confirmamos la operación
     time.sleep(1)
     cel_terminar(driver)                    # Volvemos al menú principal
     time.sleep(1)
