@@ -299,7 +299,28 @@ def mc_renombrar_y_mover(origen, destino, mes):
         shutil.move(new_name, destination / new_name.name)
         print(f"Archivo trasladado a {destination}")
 
-### Funciones para actualizar la base de datos con comprobantes de Mis Comprobantes
+### Funciones para actualizar la base de datos 
+
+#### Funciones generales
+
+def insertar_en_base(df, db_path, table, unique_column):
+    """
+    Función para insertar datos en la base de datos
+    df      = datos a insertar
+    db_path = base donde insertar
+    table   = tabla donde insertar
+    unique_column = columna de identificación para eliminar duplicados antes de agregar nueva data a la tabla
+    return la cantidad de inserciones
+    """
+    engine           = create_engine(f'sqlite:///{db_path}')
+    datos_existentes = pd.read_sql(f'SELECT {unique_column} FROM {table}', engine)
+    datos_nuevos     = df[~df[unique_column].isin(datos_existentes[unique_column])]
+    cantidad_insertada = datos_nuevos.to_sql(table, engine, if_exists='append', index=False, method='multi')
+
+    return cantidad_insertada
+
+
+#### Funciones para Mis Comprobantes
 
 def extraer_comprobantes(mc_zip_file: Path, eliminar_zip: bool=True):
     """Extrae (sueltos) todos los archivos del ZIP dado en el directorio padre del archivo."""

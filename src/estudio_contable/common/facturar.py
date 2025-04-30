@@ -23,7 +23,7 @@ df = pd.read_excel(facturas_a_subir,sheet_name='ventas_a_subir')
 
 print("Estas son las ventas a publicar:")
 print(df.head())
-proceder = print(input('Proceder? s/n > '))
+proceder = input('Proceder? s/n > ')
 
 if proceder == "s":
     driver = afip_login(user, password)
