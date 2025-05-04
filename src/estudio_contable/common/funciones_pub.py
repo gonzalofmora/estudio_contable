@@ -28,6 +28,18 @@ variables = dotenv_values()
 clientes      = json.loads(variables.get('CLIENTES'))
 clientes_arba = json.loads(variables.get('CLIENTES_ARBA'))
 
+# Info de la base
+info_base_pg = {
+    'DB_NAME'       : variables.get('DB_NAME'),
+    'SQL_FILE_PATH' : variables.get('SQL_FILE_PATH'),
+    'DB_USER'       : variables.get('DB_USER'),
+    'DB_PASSWORD'   : variables.get('DB_PASSWORD'),
+    'DB_HOST'       : variables.get('DB_HOST'),
+    'DB_PORT'       : int(variables.get('DB_PORT'))
+}
+
+
+
 # Links
 link_afip = "https://auth.afip.gob.ar/contribuyente_/login.xhtml"
 link_afip_compras_portal_iva = r"https://liva.afip.gob.ar/liva/jsp/verCompras.do?t=21"
@@ -303,7 +315,7 @@ def mc_renombrar_y_mover(origen, destino, mes):
 
 #### Funciones generales
 
-def insertar_en_base(df, db_path, table, unique_column):
+def insertar_en_base(df, info_base_pg, table, table_key):
     """
     Función para insertar datos en la base de datos
     df      = datos a insertar
@@ -312,13 +324,12 @@ def insertar_en_base(df, db_path, table, unique_column):
     unique_column = columna de identificación para eliminar duplicados antes de agregar nueva data a la tabla
     return la cantidad de inserciones
     """
-    engine           = create_engine(f'sqlite:///{db_path}')
-    datos_existentes = pd.read_sql(f'SELECT {unique_column} FROM {table}', engine)
-    datos_nuevos     = df[~df[unique_column].isin(datos_existentes[unique_column])]
-    cantidad_insertada = datos_nuevos.to_sql(table, engine, if_exists='append', index=False, method='multi')
-
+    
+    engine = create_engine(f"postgresql+psycopg2://{info_base_pg['DB_USER']}:{info_base_pg['DB_PASSWORD']}@{info_base_pg['DB_HOST']}:{info_base_pg['DB_PORT']}/{info_base_pg['DB_NAME']}")
+    datos_existentes = pd.read_sql(f'SELECT {table_key} FROM {table}', engine)
+    datos_nuevos     = df[~df[table_key].isin(datos_existentes[table_key])]
+    cantidad_insertada = datos_nuevos.to_sql(table, engine, if_exists='append', index=False)
     return cantidad_insertada
-
 
 #### Funciones para Mis Comprobantes
 
@@ -336,13 +347,13 @@ def extraer_todos_los_comprobantes(zip_folder: Path):
     for zip_file in zip_folder_list:
         extraer_comprobantes(zip_file)
 
-def mc_insertar_ventas_raw(df, db_path):
+def mc_insertar_ventas_raw(df):
     """
     df: comprobantes a insertar
     TODO Abstraer la función para que funcione para otro tipo de comprobantes. Quizá hacer un diccionario de funciones (no recuerdo como se llama)
     """
     
-    engine = create_engine(f'sqlite:///{db_path}')
+    engine = create_engine(f"postgresql+psycopg2://{info_base_pg['DB_USER']}:{info_base_pg['DB_PASSWORD']}@{info_base_pg['DB_HOST']}:{info_base_pg['DB_PORT']}/{info_base_pg['DB_NAME']}")
     ventas_en_tabla = pd.read_sql('SELECT tipo_de_comprobante, punto_de_venta, nro_de_comprobante_desde FROM ventas_raw', engine)
 
     # Creamos la composite key para identificar los comprobantes únicos
@@ -351,7 +362,7 @@ def mc_insertar_ventas_raw(df, db_path):
     nuevas_ventas_unicas = df[~df['composite_key'].isin(ventas_en_tabla['composite_key'])]
     nuevas_ventas_unicas = nuevas_ventas_unicas.drop('composite_key', axis=1)
 
-    cantidad_insertada = nuevas_ventas_unicas.to_sql('ventas_raw', engine, if_exists='append', index=False, method='multi')
+    cantidad_insertada = nuevas_ventas_unicas.to_sql('ventas_raw', engine, if_exists='append', index=False)
     
     return cantidad_insertada
 

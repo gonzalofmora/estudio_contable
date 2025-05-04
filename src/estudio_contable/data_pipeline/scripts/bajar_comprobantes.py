@@ -19,7 +19,8 @@ meses: dict[str, str] = {
     "septiembre" : "01/09/2025 - 30/09/2025",
     "octubre"    : "01/10/2025 - 31/10/2025",
     "noviembre"  : "01/11/2025 - 30/11/2025",
-    "diciembre"  : "01/12/2025 - 31/12/2025"
+    "diciembre"  : "01/12/2025 - 31/12/2025",
+    "2025"       : "01/01/2025 - 30/04/2025"
 }
 
 mes          =  meses[input('Elegir mes a descargar: ')]
