@@ -1,4 +1,5 @@
 import json
+import logging
 import pandas  as pd
 import shutil
 import time                                                                    # time sirve para hacer demorar el archivo para que cargue
@@ -7,6 +8,7 @@ from datetime                                import datetime, timedelta
 from dotenv                                  import dotenv_values              # Para cargar environment variables
 from pathlib                                 import Path
 from selenium                                import webdriver                  # webdriver sirve para agarrar el navegador
+from selenium.common.exceptions              import TimeoutException
 from selenium.webdriver.common.by            import By                         # By sirve para filtrar elementos
 from selenium.webdriver.common.action_chains import ActionChains               # Para realizar cadenas de comandos de teclado
 from selenium.webdriver.common.keys          import Keys                       # Para importar las teclas del teclado
@@ -21,6 +23,9 @@ from sqlalchemy                              import create_engine              #
     mc = Mis comprobantes
     cel = Comprobantes en Línea
 """
+
+logger = logging.getLogger(__name__)
+
 # # Environment Variables
 variables = dotenv_values()
 # El diccionario tiene que tener la siguiente estructura:
@@ -109,6 +114,56 @@ def tabear(driver, tabeos=1, con_barra=False):
         actions.send_keys(Keys.ENTER)
     actions.perform()
 
+def encontrar_elemento(driver, locator, description="", attempts=3, wait_time=2):
+    """
+    Función para encontrar un elemento en la web. En caso de que el elemento no esté, lo intentará buscar nuevamente
+    driver: WebDriver
+    locator: Tupla (locator_type, locator_value) | Ejemplo (By.ID, 'F1:username')
+    description: Descripción del botón buscado
+    attempts: intentos de búsqueda del botón
+    wait_time: tiempo de espera antes de volver a buscar
+
+    return: el elemento en caso de encontrarlo | error
+    """
+    for attempt in range(attempts):
+        try:
+            elemento = WebDriverWait(driver, timeout=10).until(EC.presence_of_element_located(locator))
+            logger.info(f'Elemento {description} encontrado')
+            return elemento
+        except TimeoutException as e:
+            if attempt < attempts - 1:
+                logger.warning(f'No se entontró el elemento {description} porque {e}. Reintentando...')
+                driver.refresh()
+                time.sleep(wait_time)
+            else:
+                logger.error(f'El elemento {description} no está porque {e}.')
+                raise RuntimeError(f'No se encontró el elemento {description}') from e
+
+def interactuar_con_elemento(driver, locator, description="", action=0, send_input=None):
+    """
+    Función para interactuar con los elementos. Por ahora solo para clickear o enviar un input al elemento.
+    driver: WebDriver
+    locator: Tupla (locator_type, locator_value) | Ejemplo (By.ID, 'F1:username')
+    description: Descripción del botón buscado
+    action: 
+        0 → clickear
+        1 → Ingresar input
+        2 → Ingresar input de desplegable y elegirlo (enter)
+    send_input: el input que se le quiera mandar
+    return: el elemento. 
+    """
+    elemento = encontrar_elemento(driver, locator, description)
+    if action == 1:
+        elemento.clear()
+        elemento.send_keys(send_input)
+    elif action == 2:
+        elemento.clear()
+        elemento.send_keys(send_input)
+        elemento.send_keys(Keys.ARROW_DOWN)
+        elemento.send_keys(Keys.ENTER)
+    else:
+        elemento.click()
+    return elemento
 
 ## Funciones para trabajar con la (eventual) base de datos
 def elegir_cliente():
@@ -185,47 +240,68 @@ def afip_cerrar_sesion(driver):
 
 def afip_elegir_aplicativo(driver, aplicativo=0, elegir_applicativo=False):
     """
-    Aplicativos:
-    0 → Mis Comprobantes,
-    1 → Comprobantes en línea,
-    2 → SIFERE WEB,
-    3 → SIFERE Consultas,
-    4 → Portal IVA
+    Función para elegir qué aplicativo de AFIP abrir
+    driver: webDriver
+    aplicativo:
+        0 → Mis Comprobantes,
+        1 → Comprobantes en línea,
+        2 → SIFERE WEB,
+        3 → SIFERE Consultas,
+        4 → Portal IVA
+        5 → Autónomos
+    elegir_aplicativo: permite elegir aplicativo que no esté en la lista. Se elige escribiéndolo
     """
-    aplicativos = ["Mis Comprobantes", "Comprobantes en línea", "Sifere WEB - DDJJ", "Sifere WEB - Consultas", "Portal IVA"]
-    aplicativo_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "buscadorInput")))
-    
+    aplicativos = ["Mis Comprobantes", "Comprobantes en línea", "Sifere WEB - DDJJ", "Sifere WEB - Consultas", "Portal IVA", "CCMA - CUENTA"]
     if elegir_applicativo:
-        input = input("> ")
-        aplicativo_input.send_keys(input)
+        nuevo_aplicativo = input("> ")
+        interactuar_con_elemento(driver, (By.ID, 'buscadorInput'), "Buscador de AFIP", 2, nuevo_aplicativo)
     else:
-        aplicativo_input.send_keys(aplicativos[aplicativo])
-
-    aplicativo_input.send_keys(Keys.ARROW_DOWN)
-    aplicativo_input.send_keys(Keys.ENTER)
+        interactuar_con_elemento(driver, (By.ID, 'buscadorInput'), "Buscador de AFIP", 2, aplicativos[aplicativo])
     time.sleep(2)
 
     tabs = driver.window_handles
     elegir_tab(driver, len(tabs)-1 )
 
 def afip_login(user, password, carpeta_descargas=None):
-    driver = abrir_navegador(link_afip,carpeta_descargas=carpeta_descargas)
-    username = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "F1:username")))
-    username.clear()
-    username.send_keys(user)
+    """
+    Función para loguearse a AFIP
+    user: CUIT
+    password: contarseña de afip
+    carpeta_descargas: a donde configurar el driver para descargar archivos.
 
-    siguiente_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "F1:btnSiguiente")))
-    siguiente_btn.click()
-
-    passwd  = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "F1:password")))
-    passwd.clear()
-    passwd.send_keys(password)
-
-    ingresar_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "F1:btnIngresar")))
-    ingresar_btn.click()
-    time.sleep(3)
+    return: WebDriver
+    """
+    driver = abrir_navegador(link_afip, carpeta_descargas)
+    interactuar_con_elemento(driver, (By.ID, 'F1:username'), 'Input del Cuit', 1, user)
+    interactuar_con_elemento(driver, (By.ID, 'F1:btnSiguiente'), 'Botón "Siguiente"', 0)
+    interactuar_con_elemento(driver, (By.ID, 'F1:password'), 'Input de la contraseña', 1, password)
+    interactuar_con_elemento(driver, (By.ID, 'F1:btnIngresar'), 'Botón "Ingresar"', 0)
+    time.sleep(2)
     return driver
 
+def afip_vep_aut_mon(user, password, tipo_vep, eleccion_manual=False):
+    """
+    Función para generar un VEP para el pago de autónomos o monotributo
+    user: cuit del cliente
+    password: contraseña de AFIP
+    tipo_vep: 'aut' | 'mon' → Sí o sí tiene que ser alguno de estos dos valores. Así busca el botón
+    """
+    driver = afip_login(user, password)
+    afip_elegir_aplicativo(driver, 5)
+    interactuar_con_elemento(driver, (By.NAME, 'CalDeud'), 'Botón Calculo de Deuda')
+    interactuar_con_elemento(driver, (By.NAME, 'GENVOL'), 'Botón Generar Volante de Pago')
+    
+    if eleccion_manual:
+        input('Seleccione el VEP a generar y luego ingrese ENTER')
+        interactuar_con_elemento(driver, (By.NAME, 'GenerarVEP'), 'Botón para generar el VEP')
+    else:
+        interactuar_con_elemento(driver, (By.NAME, f'check_{tipo_vep}_capital'), 'Casilla de pago mensual autónomos (último mes)')
+        confirmar = input('Confirmar monto (s/n): ')
+        if confirmar == 's':
+            interactuar_con_elemento(driver, (By.NAME, 'GenerarVEP'), 'Botón para generar el VEP')
+        else:
+            input('Seleccione el VEP a generar y luego ingrese ENTER')
+            interactuar_con_elemento(driver, (By.NAME, 'GenerarVEP'), 'Botón para generar el VEP')
 
 ### Funciones para trabajar con el portal Mis Comprobantes dentro de AFIP
 def mc_descargar_comprobantes(driver, mes, tipo='csv'):
