@@ -8,6 +8,7 @@ from datetime                                import datetime, timedelta
 from dotenv                                  import dotenv_values              # Para cargar environment variables
 from pathlib                                 import Path
 from selenium                                import webdriver                  # webdriver sirve para agarrar el navegador
+from selenium.common.exceptions              import ElementClickInterceptedException
 from selenium.common.exceptions              import TimeoutException
 from selenium.webdriver.common.by            import By                         # By sirve para filtrar elementos
 from selenium.webdriver.common.action_chains import ActionChains               # Para realizar cadenas de comandos de teclado
@@ -48,6 +49,8 @@ info_base_pg = {
 # Links
 link_afip = "https://auth.afip.gob.ar/contribuyente_/login.xhtml"
 link_afip_compras_portal_iva = r"https://liva.afip.gob.ar/liva/jsp/verCompras.do?t=21"
+link_agip = "https://claveciudad.agip.gob.ar/"
+link_agip_rs = 'https://lb.agip.gob.ar/ConsultaRS/'
 
 # Funciones para trabajar con directorios
 def extraer_zip(archivo, destino, eliminar=True):
@@ -86,6 +89,7 @@ def abrir_navegador(link, carpeta_descargas=None):
             "download.default_directory": str(carpeta_descargas),
             "download.prompt_for_download": False,
             "download.directory_upgrade": True,
+            "plugins.always_open_pdf_externally": True,
             "safebrowsing.enabled": True
         }
         options.add_experimental_option("prefs", prefs)
@@ -127,9 +131,15 @@ def encontrar_elemento(driver, locator, description="", attempts=3, wait_time=2)
     """
     for attempt in range(attempts):
         try:
-            elemento = WebDriverWait(driver, timeout=10).until(EC.presence_of_element_located(locator))
-            logger.info(f'Elemento {description} encontrado')
+            WebDriverWait(driver, timeout=10).until(EC.presence_of_element_located(locator))
+            elemento = WebDriverWait(driver, timeout=10).until(EC.element_to_be_clickable(locator))
             return elemento
+        
+        # except ElementClickInterceptedException:
+        #     print(f'Elemento interceptado, intentando hacer click vía JavaScript: {description}')
+        #     driver.execute_script("arguments[0].click();", elemento)
+        #     return elemento
+        
         except TimeoutException as e:
             if attempt < attempts - 1:
                 logger.warning(f'No se entontró el elemento {description} porque {e}. Reintentando...')
@@ -149,7 +159,12 @@ def interactuar_con_elemento(driver, locator, description="", action=0, send_inp
         0 → clickear
         1 → Ingresar input
         2 → Ingresar input de desplegable y elegirlo (enter)
+        3 → Seleccionar con espacio
     send_input: el input que se le quiera mandar
+    expected_condition: La condición de aparición del elemento. Hay varias (ver documentación Selenium):
+        0 : EC.presence_of_element_located → Presencia del elemento, la más común y la default
+        1 : EC.text_to_be_present_in_element
+        2 : EC.element_to_be_clickable
     return: el elemento. 
     """
     elemento = encontrar_elemento(driver, locator, description)
@@ -161,6 +176,8 @@ def interactuar_con_elemento(driver, locator, description="", action=0, send_inp
         elemento.send_keys(send_input)
         elemento.send_keys(Keys.ARROW_DOWN)
         elemento.send_keys(Keys.ENTER)
+    elif action == 3:
+        elemento.send_keys(Keys.SPACE)
     else:
         elemento.click()
     return elemento
@@ -279,29 +296,38 @@ def afip_login(user, password, carpeta_descargas=None):
     time.sleep(2)
     return driver
 
-def afip_vep_aut_mon(user, password, tipo_vep, eleccion_manual=False):
+def afip_vep_aut_mon(user, password, tipo_vep, opcion_vep, eleccion_manual=False):
     """
     Función para generar un VEP para el pago de autónomos o monotributo
     user: cuit del cliente
     password: contraseña de AFIP
     tipo_vep: 'aut' | 'mon' → Sí o sí tiene que ser alguno de estos dos valores. Así busca el botón
+    opcion_vep: 
+        1 → Red Link
+        2 → Pago Mis Cuentas
     """
+    opciones_vep = {
+        1 : ['1001', 'Red Link'], 
+        2 : ['1002', 'Pago Mis Cuentas']
+    }
     driver = afip_login(user, password)
     afip_elegir_aplicativo(driver, 5)
-    interactuar_con_elemento(driver, (By.NAME, 'CalDeud'), 'Botón Calculo de Deuda')
-    interactuar_con_elemento(driver, (By.NAME, 'GENVOL'), 'Botón Generar Volante de Pago')
+    interactuar_con_elemento(driver, (By.NAME, 'CalDeud'), 'Botón "CÁLCULO DE DEUDA"')
+    interactuar_con_elemento(driver, (By.NAME, 'GENVOL'), 'Botón "VOLANTE DE PAGO"')
     
     if eleccion_manual:
         input('Seleccione el VEP a generar y luego ingrese ENTER')
-        interactuar_con_elemento(driver, (By.NAME, 'GenerarVEP'), 'Botón para generar el VEP')
-    else:
-        interactuar_con_elemento(driver, (By.NAME, f'check_{tipo_vep}_capital'), 'Casilla de pago mensual autónomos (último mes)')
+        interactuar_con_elemento(driver, (By.NAME, 'GenerarVEP'), 'Botón "GENERAR VEP O QR"')
+        interactuar_con_elemento(driver, (By.XPATH, f"(//input[@name='check_{tipo_vep}_capital'])[2]"), 'Casilla de pago')
         confirmar = input('Confirmar monto (s/n): ')
         if confirmar == 's':
-            interactuar_con_elemento(driver, (By.NAME, 'GenerarVEP'), 'Botón para generar el VEP')
+            interactuar_con_elemento(driver, (By.NAME, 'GenerarVEP'), 'Botón "GENERAR VEP O QR"')
         else:
             input('Seleccione el VEP a generar y luego ingrese ENTER')
-            interactuar_con_elemento(driver, (By.NAME, 'GenerarVEP'), 'Botón para generar el VEP')
+            interactuar_con_elemento(driver, (By.NAME, 'GenerarVEP'), 'Botón "GENERAR VEP O QR"')
+    interactuar_con_elemento(driver, (By.ID, opciones_vep[opcion_vep][0]), f'Botón "{opciones_vep[opcion_vep][1]}"')
+    interactuar_con_elemento(driver, (By.XPATH, "//button[normalize-space()='Aceptar']"), 'Confirmar Generación del VEP')
+    interactuar_con_elemento(driver, (By.XPATH, "//span[contains(@class, 'material-icons') and normalize-space()='picture_as_pdf']"), 'Descargar PDF')
 
 ### Funciones para trabajar con el portal Mis Comprobantes dentro de AFIP
 def mc_descargar_comprobantes(driver, mes, tipo='csv'):
@@ -501,4 +527,39 @@ def mc_pre_procesamiento_ventas_csv(file_path: Path):
     return df_ventas_csv
 
 
+## Funciones AGIP
 
+def agip_login(user, password, carpeta_descargas=None):
+    driver = abrir_navegador(link_agip, carpeta_descargas)
+    interactuar_con_elemento(driver, (By.ID, "cuit"), 'Input: "CUIT"', 1, user)
+    interactuar_con_elemento(driver, (By.ID, "clave"), 'Input: "CLAVE"', 1, password)
+    interactuar_con_elemento(driver, (By.CSS_SELECTOR,"a.btn.btn-primary.btn-block.btn-lg"), 'Botón "Ingresar"')
+    return driver
+
+def agip_cerrar_sesion(driver):
+    """
+    Función para cerrar sesión en AGIP. Busca el desplegable del usuario y cierra la sesión
+    driver: webDriver
+    """
+    interactuar_con_elemento(driver, (By.ID, "li-navbar-concc-ident-impu"), "Desplegable del usuario" )
+    interactuar_con_elemento(driver, (By.ID, "li-navbar-concc-salir"), "Botón para cerrar sesión" )
+
+def agip_regimen_simplificado(user, password, carpeta_descargas=None):
+    driver = agip_login(user, password, carpeta_descargas)
+    interactuar_con_elemento(driver, (By.XPATH, "//h5[normalize-space()='Consulta Regimen Simplificado']"), 'Botón "Consulta Régimen Simplificado"')
+    interactuar_con_elemento(driver, (By.ID, "myModalBtnOk"), 'Pop-up: "Ok"')
+    interactuar_con_elemento(driver, (By.XPATH, "(//input[@type='checkbox' and contains(@class, 'check')])[last() - 1]"), 'Anteúltima Chechbox mes de pago',3)
+    confirmar = input('Confirmar pago(s/n): ') == 's'
+    if confirmar:
+        interactuar_con_elemento(driver, (By.ID, "btnGenerarVeps"), 'Botón: "Obtener Boletas / Pagos"')
+    else:
+        input('Seleccione el mes a pagar y luego ENTER')
+        interactuar_con_elemento(driver, (By.ID, "btnGenerarVeps"), 'Botón: "Obtener Boletas / Pagos"')
+    
+    # Originalmente abría un iframe. Tuve que cambiar la función abrir_navegador para que no lo abra y lo baje directo. Quizá no funcione para VEPs
+    interactuar_con_elemento(driver, (By.ID, "img-btn-pago-efectivo"), 'Botón: "Ver boletas" (genera Boleta de Pago)')
+    time.sleep(2)
+    driver.refresh()
+    agip_cerrar_sesion(driver)
+    
+    return driver
