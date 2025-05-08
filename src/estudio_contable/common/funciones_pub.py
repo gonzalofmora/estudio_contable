@@ -51,6 +51,8 @@ link_afip = "https://auth.afip.gob.ar/contribuyente_/login.xhtml"
 link_afip_compras_portal_iva = r"https://liva.afip.gob.ar/liva/jsp/verCompras.do?t=21"
 link_agip = "https://claveciudad.agip.gob.ar/"
 link_agip_rs = 'https://lb.agip.gob.ar/ConsultaRS/'
+LINK_SEH_LANUS = 'https://consultaweb.lanus.gob.ar/DeclaracionJurada/'
+LINK_SEH_LOMAS = 'https://sag.lomasdezamora.gov.ar/#comercio-mensual'
 
 # Funciones para trabajar con directorios
 def extraer_zip(archivo, destino, eliminar=True):
@@ -71,27 +73,40 @@ def extraer_zip(archivo, destino, eliminar=True):
         archivo.unlink()
 
 ## Funciones para navegar en internet
-def abrir_navegador(link, carpeta_descargas=None):
+def abrir_navegador(link, carpeta_descargas=None, modo_descarga=0):
     """ Abre el navegador web
     link: el link que querés abrir
     carpeta_descargas: la carpeta donde querés guardar las descargas. None por defecto.
+    modo_descarga: Hay varias formas de configurar la descargas de archivos. Cada página tiene sus vericuetos
+        0 → Sirve para AFIP
+        1 → Sirve para AGIP Régimen simplificado
     """
     
     # Configuración para que Chrome no se cierre cuando termina el script
     options = webdriver.ChromeOptions()
     options.add_experimental_option('detach',True)
 
-    if carpeta_descargas:
-        carpeta_descargas = Path(carpeta_descargas)
-        carpeta_descargas.mkdir(parents=True, exist_ok=True)
-
-        prefs = {
+    dict_pref = {
+        0 : {
+            "download.default_directory": str(carpeta_descargas),
+            "download.prompt_for_download": False,
+            "download.directory_upgrade": True,
+            "safebrowsing.enabled": True
+        },
+        1 : {
             "download.default_directory": str(carpeta_descargas),
             "download.prompt_for_download": False,
             "download.directory_upgrade": True,
             "plugins.always_open_pdf_externally": True,
             "safebrowsing.enabled": True
-        }
+        },
+    }
+
+    if carpeta_descargas:
+        carpeta_descargas = Path(carpeta_descargas)
+        carpeta_descargas.mkdir(parents=True, exist_ok=True)
+
+        prefs = dict_pref[modo_descarga]
         options.add_experimental_option("prefs", prefs)
 
 
@@ -161,10 +176,6 @@ def interactuar_con_elemento(driver, locator, description="", action=0, send_inp
         2 → Ingresar input de desplegable y elegirlo (enter)
         3 → Seleccionar con espacio
     send_input: el input que se le quiera mandar
-    expected_condition: La condición de aparición del elemento. Hay varias (ver documentación Selenium):
-        0 : EC.presence_of_element_located → Presencia del elemento, la más común y la default
-        1 : EC.text_to_be_present_in_element
-        2 : EC.element_to_be_clickable
     return: el elemento. 
     """
     elemento = encontrar_elemento(driver, locator, description)
@@ -530,7 +541,7 @@ def mc_pre_procesamiento_ventas_csv(file_path: Path):
 ## Funciones AGIP
 
 def agip_login(user, password, carpeta_descargas=None):
-    driver = abrir_navegador(link_agip, carpeta_descargas)
+    driver = abrir_navegador(link_agip, carpeta_descargas, 1)
     interactuar_con_elemento(driver, (By.ID, "cuit"), 'Input: "CUIT"', 1, user)
     interactuar_con_elemento(driver, (By.ID, "clave"), 'Input: "CLAVE"', 1, password)
     interactuar_con_elemento(driver, (By.CSS_SELECTOR,"a.btn.btn-primary.btn-block.btn-lg"), 'Botón "Ingresar"')
@@ -562,4 +573,100 @@ def agip_regimen_simplificado(user, password, carpeta_descargas=None):
     driver.refresh()
     agip_cerrar_sesion(driver)
     
+    return driver
+
+### Funciones para interactuar con la página de Seguridad e Higiene de Lanús
+
+def seh_lanus(user, password, monto=0, carpeta_descargas=None):
+    """
+    Función para liquidar Seguridad e Higiene de Lanús
+    user: CUIT
+    password: Contraseña SEH Lanús
+    monto: monto mensual que facturó el cliente
+    carpeta_descargas: Ubicación del pdf a descargar
+    return WebDriver
+    """
+    mes = input("Ingresar mes a liquidar (ene = 01): ")
+    driver = abrir_navegador(LINK_SEH_LANUS, carpeta_descargas)
+    actions = ActionChains(driver)
+    
+    interactuar_con_elemento(driver, (By.ID, 'txtCuenta'),"Input: CUIT", 1, user)
+    actions.send_keys(Keys.TAB).perform()
+    time.sleep(1)
+    interactuar_con_elemento(driver, (By.ID, 'txtClave'),"Input: Clave", 1, password)
+    interactuar_con_elemento(driver, (By.ID, 'btnConsultar'),"Botón: Consultar")
+    
+    interactuar_con_elemento(driver, (By.ID, 'txtMes'),"Input: Mes", 1, mes)
+    actions.send_keys(Keys.TAB).perform()
+    interactuar_con_elemento(driver, (By.ID, 'btnConsultar'),"Botón: Consultar")
+    #actions.send_keys(Keys.TAB).perform()
+    interactuar_con_elemento(driver, (By.XPATH, "(//input[@id='TextBox1'])[1]"),"Input: Monto Mensual", 1, monto)
+    # El checkbox al parecer no es un EC.element_to_be_clickable. Rompe la función encontrar_elemento. Hay que usar javascript para clickearlo
+    checkbox = WebDriverWait(driver, timeout=10).until(EC.presence_of_element_located((By.XPATH, "//input[@id='lblLeyendaSF']")))
+    driver.execute_script("arguments[0].click();", checkbox)
+    input('ENTER para continuar')
+    #actions.send_keys(Keys.TAB).perform()
+    interactuar_con_elemento(driver, (By.ID, 'btnGrabar'),"Botón: Aceptar")
+    interactuar_con_elemento(driver, (By.ID, 'btnAceptar'),"Botón: Grabar")
+    interactuar_con_elemento(driver, (By.ID, 'hideModalPopupViaServer'),"Pop-up de Confirmación: Aceptar")
+    input('ENTER para continuar')
+    #interactuar_con_elemento(driver, (By.ID, 'btnConsultar'), "Botón: Boleta de pago")
+    #btn_aceptar = WebDriverWait(driver, timeout=10).until(EC.presence_of_element_located((By.ID, 'btnGravar')))
+    #driver.execute_script("arguments[0].click();", btn_aceptar)
+
+    return driver
+
+
+### Funciones para interactuar con la página de Seguridad e Higiene de Lomas
+
+def seh_lomas(user_type, user, password, monto, carpeta_descargas=None):
+    """
+    Función para liquidar SEH Lomas.
+    user_type:
+        1 = DNI
+        2 = CUIL/CUIT
+    user: nro de identidad según user_type
+    password: contraseña de SEH Lomas
+    monto: monto facturado
+    carpeta_descargas: Path de descarga de la documentación
+    """
+    driver = abrir_navegador(LINK_SEH_LOMAS, carpeta_descargas)
+    time.sleep(1)
+    interactuar_con_elemento(driver, (By.ID, 'Button3'), "Pop-up: Aceptar")
+    desplegable = Select(encontrar_elemento(driver, (By.ID, 'ctl06_ddlTipo'), "Desplegable: Seleccionar Tipo"))
+    desplegable.select_by_index(user_type)
+    interactuar_con_elemento(driver, (By.ID, 'ctl06_user'), "Input: DNI/CUIL/CUIT", 1, user)
+    interactuar_con_elemento(driver, (By.ID, 'ctl06_password'), "Input: Clave", 1, password)
+    tabear(driver, 1)
+    time.sleep(1)
+    interactuar_con_elemento(driver, (By.XPATH, "//a[contains(text(), 'Declaraciones Juradas')]"),"Botón: Declaraciones Juradas")
+    interactuar_con_elemento(driver, (By.XPATH, "//a[@mdata='comercio-mensual']"),"Botón: Mensual por Ingresos")
+    driver.switch_to.frame(WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "app"))))
+    interactuar_con_elemento(driver, (By.ID, 'btnAceptar2'), "Botón: Consultar")
+    interactuar_con_elemento(driver, (By.XPATH, "(//input[@id='TextBox1'])[1]"), "Input: Monto mensual", 1, monto)
+    empleados = input('Ingrese cantidad de empleados: ')
+    interactuar_con_elemento(driver, (By.XPATH, "(//input[@id='TextBox1'])[2]"), "Input: Empleados", 1, empleados)
+    checkbox = WebDriverWait(driver, timeout=10).until(EC.presence_of_element_located((By.XPATH, "//input[@id='lblLeyendaSF']")))
+    driver.execute_script("arguments[0].click();", checkbox)
+    input('ENTER para confirmar la declaración')
+    interactuar_con_elemento(driver, (By.ID, 'btnGrabar'),"Botón: Aceptar")
+    input('ENTER cuando se pueda grabar la declaración')
+    interactuar_con_elemento(driver, (By.ID, 'btnAceptar'),"Botón: Grabar")
+    input('ENTER después de imprimir')
+    driver.switch_to.default_content()
+    interactuar_con_elemento(driver, (By.XPATH, "//a[contains(text(), 'Consulta de Deuda ')]"),"Botón: Consulta de Deuda")
+    interactuar_con_elemento(driver, (By.XPATH, "//a[@mdata='estado-de-deuda']"),"Botón: Estado de Deuda")
+    driver.switch_to.frame(WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "app"))))
+    interactuar_con_elemento(driver, (By.ID, 'rdbComercio'))
+    interactuar_con_elemento(driver, (By.ID, 'btnConsultar'))
+    input('ENTER Cuando se vea la deuda')
+    driver.switch_to.default_content()
+    driver.switch_to.frame(WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "app"))))
+    checkbox = WebDriverWait(driver, timeout=10).until(EC.presence_of_element_located((By.XPATH, "(//div[@class='checkbox-inline'])[last()]")))
+    driver.execute_script("arguments[0].click();", checkbox)
+    interactuar_con_elemento(driver, (By.XPATH, "//button[@id='btnConsultar']"))
+    input('ENTER después de imprimir')
+
+    driver.quit()
+
     return driver
