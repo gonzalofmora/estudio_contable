@@ -17,7 +17,7 @@ from selenium.webdriver.support              import expected_conditions as EC  #
 from selenium.webdriver.support.ui           import Select                     # Para elegir de desplegables
 from selenium.webdriver.support.ui           import WebDriverWait              # Para que espere mientras carga la página 
 from sqlalchemy                              import create_engine              # Para interactuar con la base de datos
-
+from estudio_contable.common.basicos         import abrir_navegador, afip_login, afip_elegir_aplicativo, Elemento, Alerta, Boton, Desplegable, Lista
 
 """
 # Glosario de iniciales de las funciones
@@ -47,7 +47,7 @@ info_base_pg = {
 
 
 # Links
-link_afip = "https://auth.afip.gob.ar/contribuyente_/login.xhtml"
+
 link_afip_compras_portal_iva = r"https://liva.afip.gob.ar/liva/jsp/verCompras.do?t=21"
 link_agip = "https://claveciudad.agip.gob.ar/"
 link_agip_rs = 'https://lb.agip.gob.ar/ConsultaRS/'
@@ -73,56 +73,6 @@ def extraer_zip(archivo, destino, eliminar=True):
         archivo.unlink()
 
 ## Funciones para navegar en internet
-def abrir_navegador(link, carpeta_descargas=None, modo_descarga=0):
-    """ Abre el navegador web
-    link: el link que querés abrir
-    carpeta_descargas: la carpeta donde querés guardar las descargas. None por defecto.
-    modo_descarga: Hay varias formas de configurar la descargas de archivos. Cada página tiene sus vericuetos
-        0 → Sirve para AFIP
-        1 → Sirve para AGIP Régimen simplificado
-    """
-    
-    # Configuración para que Chrome no se cierre cuando termina el script
-    options = webdriver.ChromeOptions()
-    options.add_experimental_option('detach',True)
-
-    dict_pref = {
-        0 : {
-            "download.default_directory": str(carpeta_descargas),
-            "download.prompt_for_download": False,
-            "download.directory_upgrade": True,
-            "safebrowsing.enabled": True
-        },
-        1 : {
-            "download.default_directory": str(carpeta_descargas),
-            "download.prompt_for_download": False,
-            "download.directory_upgrade": True,
-            "plugins.always_open_pdf_externally": True,
-            "safebrowsing.enabled": True
-        },
-    }
-
-    if carpeta_descargas:
-        carpeta_descargas = Path(carpeta_descargas)
-        carpeta_descargas.mkdir(parents=True, exist_ok=True)
-
-        prefs = dict_pref[modo_descarga]
-        options.add_experimental_option("prefs", prefs)
-
-
-    driver = webdriver.Chrome(options=options)
-
-    driver.get(link)
-    return driver
-
-def elegir_tab(driver, num):
-    """Elegí la pestaña que quieras usar, usando su número correspondiente (primera pestaña es el 0)"""
-    tabs = driver.window_handles
-    if num < len(tabs):
-        driver.switch_to.window(tabs[num])
-    else:
-        raise IndexError("La tab no existe")
-
 def tabear(driver, tabeos=1, con_barra=False):
     "Acción para tabear muchas veces y apretar enter. con_barra sirve para apretar la barra en vez del enter"
     actions = ActionChains(driver)
@@ -265,48 +215,6 @@ def afip_cerrar_sesion(driver):
     cerrar_sesion_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "fa.fa-sign-out.h4.text-primary.m-a-0")))
     cerrar_sesion_btn.click()
     #driver.find_element(By.CLASS_NAME, "fa.fa-sign-out.h4.text-primary.m-a-0").click()
-
-def afip_elegir_aplicativo(driver, aplicativo=0, elegir_applicativo=False):
-    """
-    Función para elegir qué aplicativo de AFIP abrir
-    driver: webDriver
-    aplicativo:
-        0 → Mis Comprobantes,
-        1 → Comprobantes en línea,
-        2 → SIFERE WEB,
-        3 → SIFERE Consultas,
-        4 → Portal IVA
-        5 → Autónomos
-    elegir_aplicativo: permite elegir aplicativo que no esté en la lista. Se elige escribiéndolo
-    sin return
-    """
-    aplicativos = ["Mis Comprobantes", "Comprobantes en línea", "Sifere WEB - DDJJ", "Sifere WEB - Consultas", "Portal IVA", "CCMA - CUENTA"]
-    if elegir_applicativo:
-        nuevo_aplicativo = input("> ")
-        interactuar_con_elemento(driver, (By.ID, 'buscadorInput'), "Buscador de AFIP", 2, nuevo_aplicativo)
-    else:
-        interactuar_con_elemento(driver, (By.ID, 'buscadorInput'), "Buscador de AFIP", 2, aplicativos[aplicativo])
-    time.sleep(2)
-
-    tabs = driver.window_handles
-    elegir_tab(driver, len(tabs)-1 )
-
-def afip_login(user, password, carpeta_descargas=None):
-    """
-    Función para loguearse a AFIP
-    user: CUIT
-    password: contarseña de afip
-    carpeta_descargas: a donde configurar el driver para descargar archivos.
-
-    return: WebDriver
-    """
-    driver = abrir_navegador(link_afip, carpeta_descargas)
-    interactuar_con_elemento(driver, (By.ID, 'F1:username'), 'Input del Cuit', 1, user)
-    interactuar_con_elemento(driver, (By.ID, 'F1:btnSiguiente'), 'Botón "Siguiente"', 0)
-    interactuar_con_elemento(driver, (By.ID, 'F1:password'), 'Input de la contraseña', 1, password)
-    interactuar_con_elemento(driver, (By.ID, 'F1:btnIngresar'), 'Botón "Ingresar"', 0)
-    time.sleep(2)
-    return driver
 
 def afip_vep_aut_mon(user, password, tipo_vep, opcion_vep, eleccion_manual=False):
     """
@@ -765,7 +673,7 @@ class Alerta(Elemento):
         super().__init__(driver, None)
     
     def _get_object(self):
-        self.object = WebDriverWait(self.driver, self.TIMEOUT).until(EC.alert_is_present())
+        return WebDriverWait(self.driver, self.TIMEOUT).until(EC.alert_is_present())
     
     def aceptar(self):
         self.object.accept()
@@ -979,12 +887,15 @@ def opcionales_pagina_4(driver, conceptos='Productos', moneda='ARS'):
 
     return resultados
 
-def facturar(driver, comprobante):
+def inicio_facturacion(driver, representante):
     # Página 1: Seleccionar empresa a representar
-    btn_empresa = BotonesEnOrdenCEL(driver, 'contribuyentes', comprobante['Representante']) 
+    btn_empresa = BotonesEnOrdenCEL(driver, 'contribuyentes', representante) 
     time.sleep(1)
     btn_empresa.click()
 
+    return driver
+
+def facturar(driver, comprobante):
     # Página 2: Seleccionar acción a realizar
     btn_accion = BotonesEnOrdenCEL(driver, 'acciones', 1)
     time.sleep(1)
@@ -993,10 +904,24 @@ def facturar(driver, comprobante):
     # Página 3: Puntos de Venta y Tipos de Comprobantes
     desplegable_punto_de_venta = Desplegable(driver, (By.NAME, 'puntoDeVenta'))
     desplegable_punto_de_venta.seleccionar_indice(comprobante['Punto de Venta'])
-    desplegable_tipo_comp = TipoComprobantes(driver, comprobante['Tipo de Representante'])
-    desplegable_tipo_comp.seleccionar_indice(desplegable_tipo_comp.options[comprobante['Tipo de Comprobante']]) # Requiere input
-    btn_continuar  = Boton(driver, (By.XPATH, "//input[@value='Continuar >']"))
     time.sleep(1)
+    if (comprobante['Tipo de Representante'] == 'MONO') & (comprobante['Tipo de Comprobante'] != 'Factura C'):
+        desplegable_tipo_comp = TipoComprobantes(driver, comprobante['Tipo de Representante'])
+        try:
+            desplegable_tipo_comp.seleccionar_indice(desplegable_tipo_comp.options[comprobante['Tipo de Comprobante']])
+        except StaleElementReferenceException:
+            desplegable_tipo_comp = TipoComprobantes(driver, comprobante['Tipo de Representante'])
+            desplegable_tipo_comp.seleccionar_indice(desplegable_tipo_comp.options[comprobante['Tipo de Comprobante']])
+
+    elif (comprobante['Tipo de Representante'] == 'RI') & (comprobante['Tipo de Comprobante'] != 'Factura A'):
+        desplegable_tipo_comp = TipoComprobantes(driver, comprobante['Tipo de Representante'])
+        try:
+            desplegable_tipo_comp.seleccionar_indice(desplegable_tipo_comp.options[comprobante['Tipo de Comprobante']])
+        except StaleElementReferenceException:
+            desplegable_tipo_comp = TipoComprobantes(driver, comprobante['Tipo de Representante'])
+            desplegable_tipo_comp.seleccionar_indice(desplegable_tipo_comp.options[comprobante['Tipo de Comprobante']])
+    time.sleep(1)
+    btn_continuar  = Boton(driver, (By.XPATH, "//input[@value='Continuar >']"))
     btn_continuar.click()
 
     # Página 4: Datos de emisión (Paso 1 de 4)
@@ -1049,3 +974,35 @@ def facturar(driver, comprobante):
     print('El comprobante fue facturado con éxito')
 
     return driver
+
+def facturar_todo(driver, excel_file):
+    df_datos_generales = pd.read_excel(excel_file, sheet_name="datos_generales")
+    representante      = df_datos_generales['eleccion'][0]
+    df_comprobantes    = pd.read_excel(excel_file, sheet_name="comprobantes")
+    df_comprobantes    = df_comprobantes.iloc[:,0:13].dropna()
+    driver = inicio_facturacion(driver, representante)
+
+    for _, row in df_comprobantes.iterrows():
+        comprobante = {
+            'Tipo de Representante'  : df_datos_generales['eleccion'][1],
+            'Punto de Venta'         : str(int(row['punto_de_venta'])),
+            'Tipo de Comprobante'    : row['tipo_comprobante'],
+            'Fecha del Comprobante'  : row['fecha_comprobante'].strftime('%d/%m/%Y'),
+            'Concepto'               : row['concepto'],
+            'Fecha Desde'            : row['fecha_desde'].strftime('%d/%m/%Y'),
+            'Fecha Hasta'            : row['fecha_hasta'].strftime('%d/%m/%Y'),
+            'Fecha Vto del Pago'     : row['fecha_vto_pago'].strftime('%d/%m/%Y'),
+            'Acitividad'             : str(int(row['actividad'])),
+            'Condición IVA Receptor' : row['condicion_iva_receptor'],
+            'Forma de Pago'          : row['forma_de_pago'],
+            'Detalle de venta'       : row['detalle'],
+            'Cantidad'               : str(int(row['cantidad'])),
+            'Precio'                 : row['precio_unitario']
+        }
+        driver = facturar(driver, comprobante)
+        print(f'{row}')
+        print('-' * 40)
+
+def cel_facturacion(user, password, excel_file):
+    driver = cel_ingreso(user, password)
+    facturar_todo(driver, excel_file)
