@@ -331,9 +331,10 @@ def facturar(driver, comprobante):
 
 def facturar_todo(driver, excel_file):
     df_datos_generales = pd.read_excel(excel_file, sheet_name="datos_generales")
-    representante      = df_datos_generales['eleccion'][0]
-    df_comprobantes    = pd.read_excel(excel_file, sheet_name="comprobantes")
-    df_comprobantes    = df_comprobantes.iloc[:,0:13].dropna()
+    representante               = df_datos_generales['eleccion'][0]
+    df_comprobantes             = pd.read_excel(excel_file, sheet_name="comprobantes")
+    df_comprobantes             = df_comprobantes.iloc[:,0:13].dropna()
+    cantidad_comprobantes       = len(df_comprobantes)
     driver = inicio_facturacion(driver, representante)
 
     for _, row in df_comprobantes.iterrows():
@@ -357,6 +358,10 @@ def facturar_todo(driver, excel_file):
         print(f'{row}')
         print('-' * 40)
 
+    print(f'La facturación ha terminado. Cantidad de comprobantes generados: {cantidad_comprobantes}.')
+    return driver
+
 def cel_facturacion(user, password, excel_file):
     driver = cel_ingreso(user, password)
-    facturar_todo(driver, excel_file)
+    driver = facturar_todo(driver, excel_file)
+    driver.quit()
