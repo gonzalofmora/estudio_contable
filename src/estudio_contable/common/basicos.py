@@ -5,6 +5,7 @@ from selenium.common.exceptions              import StaleElementReferenceExcepti
 from selenium.common.exceptions              import TimeoutException
 from selenium.webdriver.common.by            import By                         # By sirve para filtrar elementos
 from selenium.webdriver.support              import expected_conditions as EC  # Para esperar los elementos
+from selenium.webdriver.common.keys          import Keys                       # Para importar las teclas del teclado
 from selenium.webdriver.support.ui           import Select                     # Para elegir de desplegables
 from selenium.webdriver.support.ui           import WebDriverWait              # Para que espere mientras carga la página 
 
@@ -157,6 +158,15 @@ def abrir_navegador(link, carpeta_descargas=None, modo_descarga=0):
     driver.get(link)
     return driver
 
+def elegir_tab(driver, num):
+    """Elegí la pestaña que quieras usar, usando su número correspondiente (primera pestaña es el 0)"""
+    tabs = driver.window_handles
+    if num < len(tabs):
+        driver.switch_to.window(tabs[num])
+    else:
+        raise IndexError("La tab no existe")
+
+
 # Funciones para interactuar con AFIP
 
 def afip_login(user, password, carpeta_descargas=None):
@@ -178,3 +188,34 @@ def afip_login(user, password, carpeta_descargas=None):
     btn_ingresar.click()
 
     return driver
+
+def afip_elegir_aplicativo(driver, aplicativo=0, elegir_applicativo=False):
+    """
+    Función para elegir qué aplicativo de AFIP abrir
+    driver: webDriver
+    aplicativo:
+        0 → Mis Comprobantes,
+        1 → Comprobantes en línea,
+        2 → SIFERE WEB,
+        3 → SIFERE Consultas,
+        4 → Portal IVA
+        5 → Autónomos
+    elegir_aplicativo: permite elegir aplicativo que no esté en la lista. Se elige escribiéndolo
+    sin return
+    """
+    def enviar_al_buscador(driver, aplicativo):
+        btn_buscador = Boton(driver, (By.ID, 'buscadorInput'))
+        btn_buscador.send_keys(aplicativo, True)
+        btn_buscador.send_keys(Keys.DOWN)
+        btn_buscador.send_keys(Keys.ENTER)
+
+    aplicativos = ["Mis Comprobantes", "Comprobantes en línea", "Sifere WEB - DDJJ", "Sifere WEB - Consultas", "Portal IVA", "CCMA - CUENTA"]
+    if elegir_applicativo:
+        nuevo_aplicativo = input("> ")
+        enviar_al_buscador(driver, nuevo_aplicativo)
+    else:
+        enviar_al_buscador(driver, aplicativos[aplicativo])
+    time.sleep(2)
+
+    tabs = driver.window_handles
+    elegir_tab(driver, len(tabs)-1 )
